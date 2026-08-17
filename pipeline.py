@@ -513,6 +513,48 @@ def summarize_unmatched_permits(permits, merged, flag_col="home_flag"):
                      f"{flag_col.replace('_flag','')}_confidence", "matched_to_mls"]]
 
 
+def export_all_flagged_permits(permits, csv_path="flagged_permits_all.csv", json_path="flagged_permits_all.json"):
+    """
+    Writes every HOME/SB840/SB15-flagged permit to its own file, matched to
+    an MLS sale or not, with coordinates. permits_mls_merged_final.csv only
+    contains permits that found a valid matched sale; this file is the
+    complement needed to show flagged permits on a map even when no sale
+    has happened yet, which is expected for most HOME/SB840 permits given
+    how recent both policies are (see summarize_unmatched_permits).
+
+    Writes both a CSV (for manual inspection) and a JSON (columnar format,
+    matching permits_data.json) since index.html's dashboard fetches
+    flagged_permits_all.json directly to show these as unsold-permit markers
+    on the map.
+    """
+    import json
+    import math
+
+    flagged = permits[
+        permits["home_flag"].notna() | permits["sb840_flag"].notna() | permits["sb15_flag"].notna()
+    ].copy()
+    cols = [
+        "original_address1", "latitude", "longitude", "housing_units", "issue_date",
+        "status_current", "home_flag", "home_confidence",
+        "sb840_flag", "sb840_confidence", "sb15_flag", "sb15_confidence",
+    ]
+    flagged = flagged[[c for c in cols if c in flagged.columns]]
+    flagged.to_csv(csv_path, index=False)
+
+    def _clean(v):
+        if isinstance(v, float) and math.isnan(v):
+            return None
+        return v
+
+    columns = list(flagged.columns)
+    rows = [[_clean(r[c]) for c in columns] for _, r in flagged.iterrows()]
+    with open(json_path, "w") as f:
+        json.dump({"columns": columns, "rows": rows}, f, separators=(",", ":"))
+
+    print(f"\nWrote {len(flagged)} flagged permits (matched to a sale or not) to {csv_path} and {json_path}")
+    return flagged
+
+
 def summarize_forsale_vs_wholestructure(merged):
     """
     Classifies each UNIQUE permit (not each sale record) as condo, whole
@@ -719,3 +761,4 @@ if __name__ == "__main__":
     summarize_unmatched_permits(permits, merged, flag_col="home_flag")
     summarize_unmatched_permits(permits, merged, flag_col="sb840_flag")
     summarize_forsale_vs_wholestructure(merged)
+    export_all_flagged_permits(permits)
