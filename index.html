@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Austin Housing Delivery: Middle Housing, HOME, and SB840</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --ink: #1B2A33; --ink-soft: #4A5A63; --paper: #F6F4EE; --paper-raised: #FFFFFF;
+    --line: #D8D3C4; --line-strong: #B8B19C; --stamp-red: #A23B2E; --ledger-green: #3D6B4F;
+    --permit-blue: #2E5266; --amber: #B8863B; --gray-flag: #8A8478;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: 'Inter', -apple-system, Segoe UI, sans-serif; line-height: 1.6; }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 1rem; margin-bottom: 2rem; }
+  header h1 { font-family: 'Georgia', serif; font-size: 30px; font-weight: 400; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header .sub { font-size: 14px; color: var(--ink-soft); }
+
+  .narrative { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 8px; padding: 1.75rem 2rem; margin-bottom: 2.5rem; font-size: 15px; }
+  .narrative h2 { font-family: 'Georgia', serif; font-weight: 400; font-size: 20px; margin-top: 0; }
+  .narrative h3 { font-family: 'Georgia', serif; font-weight: 400; font-size: 16px; margin: 1.5em 0 0.5em; }
+  .narrative p { margin: 0.75em 0; }
+  .narrative .stat { color: var(--stamp-red); font-weight: 600; }
+  .narrative .caveat { font-size: 13px; color: var(--ink-soft); border-top: 1px solid var(--line); margin-top: 1.25rem; padding-top: 1rem; }
+  .narrative table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 0.75em 0; }
+  .narrative th, .narrative td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  .narrative th { font-weight: 600; color: var(--ink-soft); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .flag-box { background: #FBF4EC; border: 1px solid var(--amber); border-radius: 6px; padding: 1rem 1.2rem; margin: 1em 0; font-size: 13.5px; }
+  .flag-box strong { color: var(--stamp-red); }
+
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-bottom: 2.5rem; }
+  .metric { background: var(--paper-raised); padding: 1rem 1.1rem; }
+  .metric .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-bottom: 6px; }
+  .metric .value { font-family: 'Georgia', serif; font-size: 26px; font-weight: 400; }
+  .metric .value.small { font-size: 18px; }
+
+  section { margin-bottom: 3rem; }
+  section h2 { font-family: 'Georgia', serif; font-size: 18px; font-weight: 400; margin: 0 0 0.4rem; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  section .section-note { font-size: 13px; color: var(--ink-soft); margin-bottom: 1.2rem; }
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .chart-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 6px; padding: 1.25rem; }
+  .chart-card h3 { font-size: 13px; font-weight: 600; margin: 0 0 1rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+  .full-width { grid-column: 1 / -1; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; font-size: 12px; color: var(--ink-soft); }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .swatch.line { width: 14px; height: 2px; border-radius: 0; }
+
+  #map { height: 520px; border: 1px solid var(--line); border-radius: 6px; }
+  .map-controls { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .map-controls label { font-size: 12px; display: flex; align-items: center; gap: 5px; background: var(--paper-raised); border: 1px solid var(--line); padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+
+  footer { font-size: 12px; color: var(--ink-soft); border-top: 1px solid var(--line); padding-top: 1.25rem; margin-top: 2rem; }
+  .loading-note { text-align: center; padding: 2rem; color: var(--ink-soft); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Austin Housing Delivery</h1>
+    <div class="sub">Middle housing pricing &middot; HOME and SB840 policy attribution &middot; permits matched to MLS sales, 2019&ndash;2026</div>
+  </header>
+
+  <div class="narrative">
+    <h2>What this shows</h2>
+    <p>Matching City of Austin building permits to MLS sales records shows that housing built at higher density sells for less per unit than single-family construction. This dataset only counts sales dated on or after the permit's issue date, so it reflects the delivered housing itself rather than a prior structure at the same address. Across <span class="stat">28,766</span> matched permit&ndash;sale records from 2019 through mid-2026, the median sale price per unit was <span class="stat">$555,000</span> for single-family homes, <span class="stat">$288,800</span> for middle housing (2&ndash;4 units per permit, 48% lower), and <span class="stat">$444,000</span> for multifamily buildings of 5+ units (20% lower). See <a href="#fig-price-per-unit">"Median price per unit"</a> for the summary chart and <a href="#fig-price-time">"Price over time"</a> for the full quarterly trend, which shows this gap narrowing and even reversing in several recent quarters rather than holding constant.</p>
+
+    <h3>Conclusion: what this means for HOME, SB840, and affordability</h3>
+    <p>Denser housing delivers meaningfully more housing per dollar than single-family construction in Austin. That is the clearest, best-supported finding in this dataset: middle housing sells for 48% less per unit and multifamily for 20% less per unit than single-family, based on thousands of correctly-matched sales spanning 2019 through 2026. This holds across nearly every year in the dataset and reflects a structural mechanism, land cost and, for whole-building sales, shared structure divided across more dwelling units, rather than a temporary market condition.</p>
+    <p>HOME is designed to shift a larger share of Austin's new construction toward exactly this kind of housing: duplexes, triplexes, and small multifamily buildings on lots that previously could only hold a single house. SB840 is designed to do something related but distinct: unlock by-right multifamily development on commercially-zoned land that previously required a discretionary rezoning process. Given how consistently middle housing and multifamily construction have delivered lower per-unit cost across seven years of market data, both laws' basic theory of change, that permitting more of this housing type lowers the effective cost of homeownership per household, is well supported by the evidence in this dataset.</p>
+    <p>What this dataset cannot yet show is either law's own realized track record at meaningful scale. HOME took effect in February 2024 and SB840 in September 2025, and this analysis only counts sales dated after a permit's issue date, the correct standard for isolating the price of the housing actually built rather than a prior structure at the same address. That correct standard leaves only 24 HOME-flagged permits and 10 SB840-flagged permits with a valid matched sale citywide. SB840's count is smaller still, and for a more basic reason than timing alone: the law is barely eleven months old as of this writing, so almost no SB840-enabled construction has had time to be built, let alone resold. These are data availability problems, not challenges to the underlying finding: Austin does not yet have enough completed, resold HOME or SB840 housing to measure either law's own price impact with statistical confidence, not because the impact is absent or in doubt.</p>
+    <p>The confident conclusion this data supports: middle housing and multifamily construction work as intended on price, wherever and however they get built. The honest limitation: Austin does not yet have enough sales history to prove HOME or SB840 specifically have delivered that outcome at scale, only that the housing types they enable reliably deliver it wherever built.</p>
+
+    <h3>How this compares to the ABOR benchmark</h3>
+    <p>The Austin Board of REALTORS and Unlock MLS published a <a href="https://assets.unlockmls.com/pu0snv8rn9fa/5HaW83ratkgNRcyg4bbhGf/6345dc34abeee86f2914aca52c70e15e/HOME_Outcomes___Market_Performance_Report_%C3%A2___ABoR_2026.pdf" target="_blank">HOME Impact Report</a> in April 2026 comparing 57 HOME Phase 1 units to 115 traditional single-family units, both built and closed within calendar year 2025, drawn from the city's own confirmed list of 436 approved Phase 1 units. Their $750,000 median (53% below the $1.58M single-family median) is very likely a genuine per-unit price, not a total-property price, since every metric in their report is analyzed per unit.</p>
+    <table>
+      <tr><th>Metric</th><th>HOME</th><th>Traditional single-family</th></tr>
+      <tr><td>Units analyzed</td><td>57</td><td>115</td></tr>
+      <tr><td>Median sales price</td><td>$750,000</td><td>$1,580,000</td></tr>
+      <tr><td>Median $/sqft</td><td>$477</td><td>$522</td></tr>
+      <tr><td>Median square footage</td><td>1,693 sq ft</td><td>3,029 sq ft</td></tr>
+      <tr><td>Median bedrooms</td><td>3</td><td>4</td></tr>
+    </table>
+    <p>One genuine point of divergence worth flagging rather than smoothing over: ABOR finds HOME units cheaper per square foot too, while this study finds middle housing and multifamily $/sqft is frequently <em>higher</em> than single-family's (see above). Likely explanations are design differences, not a contradiction: ABOR compares new construction to new construction only (this study's single-family group mixes new and resale), restricts to a single build-and-close year (this study spans 2019&ndash;2026), and draws from the city's confirmed Phase 1 list only (this study mixes a direct-match subset with a lower-confidence inferred subset and includes both phases). Both studies' HOME-specific samples are small (57 and 24 respectively), too small to rule out sampling as the source of the gap. Full comparison and methodology detail is in the README.</p>
+    <p>What both studies agree on is the larger point: HOME product sells for substantially less, in total and per unit, than traditional single-family construction. What "price per unit" means in this study specifically: for a sale recorded as a whole building purchased in one transaction, the sale price is divided by the unit count; for an individually deeded condo sale, the recorded price is used directly, since it already reflects one unit.</p>
+
+    <h3>Beds, baths, and square footage</h3>
+    <p>Denser housing types are also smaller per unit, which is expected and part of why they sell for less: median unit size is 1,709 sq ft for single-family sales, versus 952 sq ft for middle housing and 1,097 sq ft for multifamily (see <a href="#fig-unit-size">"Median unit square footage"</a>). Bedroom count follows the same pattern: median 3 bedrooms for single-family versus 2 for both middle housing and multifamily (see <a href="#fig-bedbath">"Median bedrooms & bathrooms"</a>).</p>
+
+    <h3>Price per square foot tells a different story than price per unit</h3>
+    <p>The lower price per unit does <strong>not</strong> mean denser housing is cheaper per square foot; in fact, it's frequently more expensive. Across the full dataset, median $/sqft is <span class="stat">$372</span> for single-family, <span class="stat">$322</span> for middle housing, and <span class="stat">$444</span> for multifamily, running higher per square foot than single-family, not lower (see <a href="#fig-price-per-sqft">"Median $/sqft"</a>). Looking quarter by quarter in <a href="#fig-sqft-time">"Price per square foot over time"</a>, multifamily $/sqft exceeded single-family $/sqft in <span class="stat">15 of the last 27 quarters</span> (more than half), and middle housing did in 10 of 27.</p>
+    <p>It's worth being precise about why, since the intuitive explanation (larger buildings cost more to construct, and are priced as income-generating commercial real estate) turns out not to be what's driving this number. Checking directly against sales explicitly recorded as whole-building investment transactions (one buyer purchasing an entire building) shows those sales are actually the <em>cheapest</em> housing type per square foot in the dataset, around $132/sqft, well below single-family's $372/sqft, and their total sale prices run lower than a typical single-family home's too. The higher $/sqft for the middle housing and multifamily categories overall comes almost entirely from a different source: about 89% of sales in those categories are individually-owned condos, not whole-building sales, and condos in this dataset carry their own price premium per square foot, more likely reflecting newer construction and denser, more amenity-rich locations than any construction-cost or income-property effect.</p>
+    <p>What this means for the headline finding: the per-unit savings shown above come from land cost and, for whole-building sales, shared structure being divided across more units on one lot, not from the housing being fundamentally cheaper to build or buy per square foot. Total price is not generally higher for middle housing or multifamily construction in this dataset either; where per-square-foot price is higher, it's a condo market effect rather than a size or valuation-method effect.</p>
+    <p>Price per unit and $/sqft have also grown faster for denser housing than for single-family since 2019 (nominal, not inflation-adjusted): median price per unit rose 42% for single-family, versus 243% for middle housing and 191% for multifamily (see <a href="#fig-price-time">"Price over time"</a>). Median $/sqft rose 28% for single-family, versus 188% for middle housing and 119% for multifamily (see <a href="#fig-sqft-time">"Price per square foot over time"</a>). Denser housing started from a much lower base, so a larger percentage increase is expected, but the pace is still notable: the per-unit price advantage of middle and multifamily housing appears to be narrowing over time, consistent with several recent quarters where it reversed entirely.</p>
+
+    <h3>Policy attribution</h3>
+    <p>Of the matched permits with a valid, correctly-dated sale, only <span class="stat">24</span> are flagged as HOME-related: 11 matched directly to the city's own Plan Review Case records, 6 inferred from zoning and 2&ndash;3 unit count, and 7 inferred as possible Phase 2 small-lot cases. <span class="stat">10</span> are flagged as potentially using SB840's by-right multifamily allowance (1 high-confidence, 9 needing manual verification; see <a href="#fig-policy">"Permits flagged by allowance"</a>). No SB15 activity was identified. These counts are small enough that they should be read as a rough scale, not a precise figure; the underlying reason is addressed directly in the next section. Per the city's own Nov 2025 SB840 planning staff presentation, Austin's actual by-right density entitlement under SB840 is 54 units/acre (the greater of the law's 36/acre statutory floor or the city's own pre-existing highest allowed density); our SB840 flag conservatively uses the 36/acre statutory floor as its threshold, so it may include some permits below the true 54/acre bar Austin now requires. That same presentation confirmed our full list of eligible zoning districts is correct.</p>
+
+    <h3>Is middle housing sold as condos, or as whole structures?</h3>
+    <p>MLS property type can distinguish condo sales, individually deeded units sold to one owner each, from sales explicitly recorded as a whole building purchased in a single transaction. This has to be counted at the unique-permit level rather than the sale-record level: a single condo building resells unit by unit over the years, sometimes generating well over a hundred separate sale records tied to one original permit, while a whole-structure sale typically generates just one. Counting sale records directly would make condo product look far more common than it actually is relative to the number of buildings actually permitted.</p>
+    <p>Across all 611 unique middle housing permits with a matched, correctly-dated sale, condo sales are the largest single category: <span class="stat">58%</span> are condo sales, <span class="stat">37%</span> are Single Family or Attached sales of the whole structure, and <span class="stat">5%</span> are explicit whole-building Multi-Family sales (see <a href="#fig-forsale-rental">"All middle housing permits"</a>).</p>
+    <p>Permits flagged as HOME-related look different, though the sample here is small enough that it should be read as suggestive rather than reliable: among just 13 unique HOME-flagged middle housing permits with a valid matched sale (2 condo, 11 whole-structure), the pattern points toward whole-structure sales rather than condos, the opposite of the citywide pattern above. That direction holds among the 7 high-confidence permits matched directly to a Plan Review Case (1 condo, 6 whole-structure) but with a sample this size, a single permit changes the percentage by roughly 15 points, so no precise figure should be quoted from this cut. The main reason the sample is this thin: HOME is recent enough that very few HOME-built units have had time to resell at all, addressed directly in the next section.</p>
+    <p>What this does and doesn't show: a Single Family or Attached classification on a duplex or triplex permit means the structure was sold whole to one buyer, not divided into individually owned units. It does not, on its own, distinguish an owner-occupant who lives in one unit and rents out the other from an investor who bought the whole building purely as a rental. Both are common ways a small multifamily property changes hands, and MLS property type does not separate them. What the data does support clearly: HOME-permitted duplexes and triplexes are, so far, predominantly not being sold as individually owned condo units, unlike the broader middle housing market citywide, where that split is close to even. The HOME-specific sample sizes here (84 permits, 25 for the high-confidence subset) are much smaller than the citywide comparison and should be read as a directional pattern, not a precise figure.</p>
+    <p>The price-per-unit gap between these two categories also holds over time (see <a href="#fig-forsale-rental">"Price per unit over time, condo vs whole-structure sales"</a>), though quarterly sample sizes for whole-structure sales are small enough in several quarters that individual data points should be read cautiously rather than as precise figures.</p>
+
+    <h3>HOME permits with no matched MLS sale</h3>
+    <p>A meaningful share of HOME-flagged permits don't appear anywhere in this dataset's MLS sales at all, meaning they were never matched to any resale record. It's tempting to read that as "held by the builder as a rental," but that's only one of several explanations, and probably not the largest one. A permit issued in 2025 or 2026 may simply not have finished construction yet, or finished too recently to show up in a resale. Others may be owner-occupied with no resale history at all, sold off-MLS, or missed by the address-matching process. Investment-holding by a builder is a real possibility for some of these, but not something this data can confirm or rule out on its own; MLS records a sale, not an owner's intent to hold or rent a property afterward.</p>
+    <p>The pipeline now reports the match rate by permit issue year specifically so this can be read directly rather than assumed: if the non-match rate is much higher for the most recent permits, that points to construction timing as the dominant factor rather than investment-holding. That breakdown requires rerunning the full pipeline against the complete pre-match permit set, which is not part of the slim dataset this page loads; see the project README for the exact output and how to reproduce it.</p>
+
+    <h3>How our numbers compare to the city's own reporting</h3>
+    <p>The City of Austin's <a href="https://www.austintexas.gov/development-services/home-amendments" target="_blank">HOME Amendments page</a> (updated Aug 5, 2026) reports 857 HOME Phase 1 applications reviewed, 681 approved, and 1,362 new units approved. The city's <a href="https://services.austintexas.gov/edims/document.cfm?id=463145" target="_blank">2024 HOME Annual Report</a> (covering Feb 2024&ndash;Feb 2025) breaks this down further and reports Phase 2 activity separately:</p>
+    <table>
+      <tr><th>Category</th><th>City-reported</th><th>Our dataset</th></tr>
+      <tr><td>HOME Phase 1 approved applications (all-time through Aug 2026)</td><td>681</td><td rowspan="2">17 flagged permits<br><span style="color:var(--ink-soft); font-size:12px;">(11 direct-matched + 6 inferred)</span></td></tr>
+      <tr><td>HOME Phase 1 approved applications (Feb 2024&ndash;Feb 2025 only)</td><td>236</td></tr>
+      <tr><td>HOME Phase 2 building permit applications (Aug 2024&ndash;Feb 2025)</td><td>6</td><td>7 flagged permits (inferred only)</td></tr>
+    </table>
+    <p>The gap between our counts and the city's is expected and reflects timing, not a data quality problem. This dataset only counts sales dated on or after the permit's issue date, the correct standard for isolating the price of the housing actually built rather than a prior structure at the same address. HOME Phase 1 only took effect in February 2024, so under that correct standard, most HOME-built housing simply has not had time to resell yet. The small counts here are a direct, expected consequence of how new the program is, addressed directly in the conclusion above. The Phase 2 count (7) happens to land close to the city's reported 6, but both numbers are small enough that this closeness shouldn't be read as meaningful agreement; the Phase 2 flag remains inferred from lot size alone, with no direct case-record match behind it, so it should be treated as low-confidence regardless.</p>
+
+    <div class="caveat">
+      <strong>Methodology notes:</strong> price per unit divides the sale price by permit-level unit count for every property type except individually-deeded condo sales, since condo sale prices already reflect one dwelling; whole-building Multi-Family sales and whole-structure Single Family or Attached sales are both divided. Only sales dated on or after the matched permit's issue date are included, which excludes sales of a prior structure at the same address. HOME direct-match flags are validated against a real DSD-confirmed list of 264 HOME applications (KXAN public records request, Dec 2024). SB840 and SB15 took effect Sept 1, 2025, giving under a year of activity to detect. SB15 relies on a proxy for "unplatted tract" status (no true plat-date records exist in public data) and returned zero matches, which reflects data availability more than actual policy usage. Address matching between permits and MLS sales uses fuzzy string matching (90+ similarity threshold). Full detail is in the project README.
+    </div>
+  </div>
+
+  <div id="dashboard-content">
+    <div class="metrics" id="metrics"></div>
+
+    <section id="fig-price-time">
+      <h2>Price over time, relative to policy changes</h2>
+      <div class="section-note">Quarterly median sale price per unit by housing type. Vertical markers show HOME Phase 1 (Feb 2024), HOME Phase 2 (Aug 2024), and SB840/SB15 (Sept 2025) effective dates.</div>
+      <div class="chart-card full-width">
+        <div class="legend">
+          <span><span class="swatch" style="background:#2E5266"></span>Single-family</span>
+          <span><span class="swatch" style="background:#3D6B4F"></span>Middle housing (2-4)</span>
+          <span><span class="swatch" style="background:#B8863B"></span>Multifamily (5+)</span>
+          <span><span class="swatch line" style="background:#A23B2E"></span>Policy effective date</span>
+        </div>
+        <div style="position:relative; height:340px;"><canvas id="chart-time-series"></canvas></div>
+      </div>
+    </section>
+
+    <section id="fig-sqft-time">
+      <h2>Price per square foot over time</h2>
+      <div class="section-note">The per-unit price gap doesn't mean denser housing is cheaper to build or buy per square foot; see narrative above. This chart shows that directly: multifamily $/sqft exceeds single-family $/sqft in 14 of the last 28 quarters.</div>
+      <div class="chart-card full-width">
+        <div class="legend">
+          <span><span class="swatch" style="background:#2E5266"></span>Single-family</span>
+          <span><span class="swatch" style="background:#3D6B4F"></span>Middle housing (2-4)</span>
+          <span><span class="swatch" style="background:#B8863B"></span>Multifamily (5+)</span>
+          <span><span class="swatch line" style="background:#A23B2E"></span>Policy effective date</span>
+        </div>
+        <div style="position:relative; height:340px;"><canvas id="chart-time-series-sqft"></canvas></div>
+      </div>
+    </section>
+
+    <section id="fig-pricing-chars">
+      <h2>Pricing and physical characteristics by unit type</h2>
+      <div class="chart-grid">
+        <div class="chart-card" id="fig-price-per-unit">
+          <h3>Median price per unit</h3>
+          <div style="position:relative; height:240px;"><canvas id="chart-price-per-unit"></canvas></div>
+        </div>
+        <div class="chart-card" id="fig-price-per-sqft">
+          <h3>Median $ / sq ft</h3>
+          <div style="position:relative; height:240px;"><canvas id="chart-price-sqft"></canvas></div>
+        </div>
+        <div class="chart-card" id="fig-bedbath">
+          <h3>Median bedrooms &amp; bathrooms</h3>
+          <div style="position:relative; height:240px;"><canvas id="chart-bedbath"></canvas></div>
+        </div>
+        <div class="chart-card" id="fig-unit-size">
+          <h3>Median unit square footage</h3>
+          <div style="position:relative; height:240px;"><canvas id="chart-sqft-size"></canvas></div>
+        </div>
+        <div class="chart-card full-width" id="fig-units-per-year">
+          <h3>Units delivered per year, by type</h3>
+          <div style="position:relative; height:280px;"><canvas id="chart-units-time"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="fig-policy">
+      <h2>Policy attribution</h2>
+      <div class="section-note">Phase 2 figures should be treated as low-confidence; see narrative above.</div>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>Permits flagged by allowance</h3>
+          <div style="position:relative; height:240px;"><canvas id="chart-flags"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>HOME-flagged permits over time</h3>
+          <div style="position:relative; height:240px;"><canvas id="chart-flags-time"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="fig-forsale-rental">
+      <h2>Is middle housing sold as condos, or as whole structures?</h2>
+      <div class="section-note">Counted at the unique-permit level, not the sale-record level; a single condo building can generate many resale records over time for one permit, which would otherwise overstate how much condo product exists. See narrative above for how these categories are defined and their limits.</div>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>All middle housing permits (n=611)</h3>
+          <div style="position:relative; height:240px;"><canvas id="chart-forsale-all"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>HOME-flagged middle housing permits (n=13)</h3>
+          <div style="position:relative; height:240px;"><canvas id="chart-forsale-home"></canvas></div>
+        </div>
+        <div class="chart-card full-width">
+          <h3>Price per unit over time, condo vs whole-structure sales (middle housing)</h3>
+          <div class="legend">
+            <span><span class="swatch" style="background:#3D6B4F"></span>Condo</span>
+            <span><span class="swatch" style="background:#B8863B"></span>Whole-structure</span>
+          </div>
+          <div style="position:relative; height:280px;"><canvas id="chart-forsale-time"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="fig-map">
+      <h2>Map</h2>
+      <div class="map-controls" id="map-controls"></div>
+      <div id="map"></div>
+    </section>
+  </div>
+
+  <div class="loading-note" id="loading-note">Loading permit and sales data&hellip;</div>
+
+  <footer>
+    Data: City of Austin Issued Construction Permits, Zoning By Address, Zoning Cases, and Plan Review Cases (data.austintexas.gov) &middot;
+    Travis Central Appraisal District parcel data &middot; MLS sales data via Privy &middot;
+    City-reported HOME figures from <a href="https://www.austintexas.gov/development-services/home-amendments" target="_blank">austintexas.gov/development-services/home-amendments</a> and the <a href="https://services.austintexas.gov/edims/document.cfm?id=463145" target="_blank">2024 HOME Annual Report</a>.
+    See README.md for full methodology and source documentation.
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const COLORS = { single: '#2E5266', middle: '#3D6B4F', multi: '#B8863B', home: '#3D6B4F', sb840: '#A23B2E', sb15: '#8A8478' };
+const POLICY_DATES = [
+  { date: '2024-02', label: 'HOME Phase 1' },
+  { date: '2024-08', label: 'HOME Phase 2' },
+  { date: '2025-09', label: 'SB840 / SB15' }
+];
+
+function unitBucket(units) {
+  const u = Number(units);
+  if (!u || u < 1) return null;
+  if (u === 1) return 'Single-family';
+  if (u >= 2 && u <= 4) return 'Middle housing (2-4)';
+  return 'Multifamily (5+)';
+}
+function median(arr) {
+  const s = arr.filter(v => v != null && !isNaN(v)).sort((a,b) => a-b);
+  if (!s.length) return null;
+  const mid = Math.floor(s.length/2);
+  return s.length % 2 ? s[mid] : (s[mid-1]+s[mid])/2;
+}
+function quarterOf(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  const q = Math.floor(d.getMonth()/3) + 1;
+  return `${d.getFullYear()}Q${q}`;
+}
+function monthOf(dateStr) {
+  if (!dateStr) return null;
+  return String(dateStr).slice(0,7);
+}
+
+let mapInstance = null, markerLayer = null;
+
+async function loadData() {
+  try {
+    const resp = await fetch('permits_data.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const payload = await resp.json();
+    const cols = payload.columns;
+    const rows = payload.rows.map(r => { const o = {}; cols.forEach((c,i) => o[c]=r[i]); return o; });
+    document.getElementById('loading-note').style.display = 'none';
+    renderDashboard(rows);
+  } catch (err) {
+    document.getElementById('loading-note').textContent = 'Could not load permits_data.json -- make sure it sits in the same folder as this page. (' + err.message + ')';
+  }
+}
+
+function renderDashboard(rows) {
+  rows.forEach(r => { r._bucket = unitBucket(r.housing_units); r._quarter = quarterOf(r.sale_date); });
+  const withPrice = rows.filter(r => r._bucket && r.Price && r.housing_units);
+  const buckets = ['Single-family', 'Middle housing (2-4)', 'Multifamily (5+)'];
+  const bucketColors = [COLORS.single, COLORS.middle, COLORS.multi];
+
+  const homeCount = rows.filter(r => r.home_flag).length;
+  const sb840Count = rows.filter(r => r.sb840_flag).length;
+
+  document.getElementById('metrics').innerHTML = `
+    <div class="metric"><div class="label">Matched permit-sale records</div><div class="value">${rows.length.toLocaleString()}</div></div>
+    <div class="metric"><div class="label">Median match confidence</div><div class="value small">${Math.round(median(rows.map(r=>r.match_score)) || 0)}%</div></div>
+    <div class="metric"><div class="label">HOME-flagged permits</div><div class="value">${homeCount.toLocaleString()}</div></div>
+    <div class="metric"><div class="label">SB840-flagged permits</div><div class="value">${sb840Count.toLocaleString()}</div></div>
+  `;
+
+  // --- Time series ---
+  const quarters = [...new Set(withPrice.map(r => r._quarter).filter(Boolean))].sort();
+  const seriesByBucket = buckets.map(b => quarters.map(q => {
+    const vals = withPrice.filter(r => r._bucket === b && r._quarter === q).map(r => r.price_per_unit);
+    return median(vals);
+  }));
+
+  const policyPlugin = {
+    id: 'policyLines',
+    afterDraw(chart) {
+      const {ctx, chartArea, scales} = chart;
+      if (!scales.x) return;
+      POLICY_DATES.forEach(p => {
+        // find nearest quarter label index for this month
+        const targetQ = (() => {
+          const [y,m] = p.date.split('-').map(Number);
+          const q = Math.floor((m-1)/3)+1;
+          return `${y}Q${q}`;
+        })();
+        const idx = quarters.indexOf(targetQ);
+        if (idx === -1) return;
+        const x = scales.x.getPixelForValue(idx);
+        ctx.save();
+        ctx.strokeStyle = '#A23B2E';
+        ctx.setLineDash([4,3]);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#A23B2E';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.save();
+        ctx.translate(x + 3, chartArea.top + 10);
+        ctx.rotate(Math.PI/2);
+        ctx.fillText(p.label, 0, 0);
+        ctx.restore();
+        ctx.restore();
+      });
+    }
+  };
+
+  new Chart(document.getElementById('chart-time-series'), {
+    type: 'line',
+    data: {
+      labels: quarters,
+      datasets: buckets.map((b,i) => ({
+        label: b, data: seriesByBucket[i], borderColor: bucketColors[i],
+        backgroundColor: bucketColors[i] + '15', fill: false, tension: 0.15, pointRadius: 2, spanGaps: true
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => '$' + (v/1000) + 'k' }, grid: { color: '#e1e0d9' } },
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 14 } }
+      }
+    },
+    plugins: [policyPlugin]
+  });
+
+  // Same quarters axis, but $/sqft instead of $/unit -- shows the per-unit price
+  // gap is NOT simply a lower cost per sqft; multifamily/middle housing often
+  // cost as much or more per sqft than single-family (see narrative).
+  const sqftSeriesByBucket = buckets.map(b => quarters.map(q => {
+    const vals = withPrice.filter(r => r._bucket === b && r._quarter === q && r.price_sqft).map(r => r.price_sqft);
+    return median(vals);
+  }));
+  new Chart(document.getElementById('chart-time-series-sqft'), {
+    type: 'line',
+    data: {
+      labels: quarters,
+      datasets: buckets.map((b,i) => ({
+        label: b, data: sqftSeriesByBucket[i], borderColor: bucketColors[i],
+        backgroundColor: bucketColors[i] + '15', fill: false, tension: 0.15, pointRadius: 2, spanGaps: true
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => '$' + v }, grid: { color: '#e1e0d9' } },
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 14 } }
+      }
+    },
+    plugins: [policyPlugin]
+  });
+
+  // --- Price per unit / sqft ---
+  const priceByBucket = buckets.map(b => median(withPrice.filter(r => r._bucket === b).map(r => r.price_per_unit)));
+  const sqftPriceByBucket = buckets.map(b => median(withPrice.filter(r => r._bucket === b && r.price_sqft).map(r => r.price_sqft)));
+  const bedsByBucket = buckets.map(b => median(rows.filter(r => r._bucket === b && r.Beds).map(r => r.Beds)));
+  const bathsByBucket = buckets.map(b => median(rows.filter(r => r._bucket === b && r.Baths).map(r => r.Baths)));
+  const sqftByBucket = buckets.map(b => median(rows.filter(r => r._bucket === b && r.sqft).map(r => r.sqft)));
+
+  new Chart(document.getElementById('chart-price-per-unit'), {
+    type: 'bar',
+    data: { labels: buckets, datasets: [{ data: priceByBucket.map(v => Math.round(v||0)), backgroundColor: bucketColors, borderRadius: 4, maxBarThickness: 60 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '$' + c.raw.toLocaleString() } } },
+      scales: { y: { ticks: { callback: v => '$' + (v/1000) + 'k' }, grid: { color: '#e1e0d9' } }, x: { grid: { display: false } } } }
+  });
+
+  new Chart(document.getElementById('chart-price-sqft'), {
+    type: 'bar',
+    data: { labels: buckets, datasets: [{ data: sqftPriceByBucket.map(v => Math.round((v||0)*100)/100), backgroundColor: bucketColors, borderRadius: 4, maxBarThickness: 60 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '$' + c.raw + '/sqft' } } },
+      scales: { y: { ticks: { callback: v => '$' + v }, grid: { color: '#e1e0d9' } }, x: { grid: { display: false } } } }
+  });
+
+  new Chart(document.getElementById('chart-bedbath'), {
+    type: 'bar',
+    data: { labels: buckets, datasets: [
+      { label: 'Beds', data: bedsByBucket, backgroundColor: '#2E5266', borderRadius: 4, maxBarThickness: 30 },
+      { label: 'Baths', data: bathsByBucket, backgroundColor: '#B8863B', borderRadius: 4, maxBarThickness: 30 }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: {size: 11} } } },
+      scales: { y: { grid: { color: '#e1e0d9' } }, x: { grid: { display: false } } } }
+  });
+
+  new Chart(document.getElementById('chart-sqft-size'), {
+    type: 'bar',
+    data: { labels: buckets, datasets: [{ data: sqftByBucket.map(v => Math.round(v||0)), backgroundColor: bucketColors, borderRadius: 4, maxBarThickness: 60 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toLocaleString() + ' sqft' } } },
+      scales: { y: { ticks: { callback: v => v.toLocaleString() }, grid: { color: '#e1e0d9' } }, x: { grid: { display: false } } } }
+  });
+
+  // --- Units per year ---
+  const years = [...new Set(rows.map(r => r.calendar_year_issued).filter(y => y))].sort();
+  const seriesFor = (b) => years.map(y => rows.filter(r => r._bucket === b && r.calendar_year_issued === y).reduce((sum, r) => sum + (Number(r.housing_units)||0), 0));
+
+  new Chart(document.getElementById('chart-units-time'), {
+    type: 'bar',
+    data: { labels: years, datasets: [
+      { label: 'Single-family', data: seriesFor('Single-family'), backgroundColor: COLORS.single, stack: 's' },
+      { label: 'Middle housing (2-4)', data: seriesFor('Middle housing (2-4)'), backgroundColor: COLORS.middle, stack: 's' },
+      { label: 'Multifamily (5+)', data: seriesFor('Multifamily (5+)'), backgroundColor: COLORS.multi, stack: 's' }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { stacked: true, grid: { color: '#e1e0d9' } }, x: { stacked: true, grid: { display: false } } } }
+  });
+  document.querySelector('#chart-units-time').closest('.chart-card').insertAdjacentHTML('afterbegin',
+    `<div class="legend">
+      <span><span class="swatch" style="background:${COLORS.single}"></span>Single-family</span>
+      <span><span class="swatch" style="background:${COLORS.middle}"></span>Middle housing (2-4)</span>
+      <span><span class="swatch" style="background:${COLORS.multi}"></span>Multifamily (5+)</span>
+    </div>`);
+
+  // --- Policy flags ---
+  const flagCounts = [homeCount, sb840Count, rows.filter(r => r.sb15_flag).length];
+  new Chart(document.getElementById('chart-flags'), {
+    type: 'bar',
+    data: { labels: ['HOME', 'SB840', 'SB15'], datasets: [{ data: flagCounts, backgroundColor: [COLORS.home, COLORS.sb840, COLORS.sb15], borderRadius: 4, maxBarThickness: 50 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { color: '#e1e0d9' } }, y: { grid: { display: false } } } }
+  });
+
+  const homeMonths = {};
+  rows.filter(r => r.home_flag).forEach(r => { const m = monthOf(r.issue_date); if (m) homeMonths[m] = (homeMonths[m]||0) + 1; });
+  const sortedMonths = Object.keys(homeMonths).sort();
+  new Chart(document.getElementById('chart-flags-time'), {
+    type: 'line',
+    data: { labels: sortedMonths, datasets: [{ data: sortedMonths.map(m => homeMonths[m]), borderColor: COLORS.home, backgroundColor: COLORS.home + '1A', fill: true, tension: 0.2, pointRadius: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { grid: { color: '#e1e0d9' } }, x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } } } }
+  });
+
+  // Precomputed at the permit level (deduplicated across resale records) from
+  // permits_mls_merged_v4_postpermit.csv, not derived client-side from the slim JSON.
+  const FORSALE_COLORS = { condo: '#3D6B4F', wholeStructure: '#B8863B', multifamily: '#A23B2E' };
+  new Chart(document.getElementById('chart-forsale-all'), {
+    type: 'bar',
+    data: {
+      labels: ['Condo (for-sale)', 'Single Family / Attached\n(whole-structure)', 'Whole-building\n(Multi-Family)'],
+      datasets: [{ data: [57.6, 37.2, 5.2], backgroundColor: [FORSALE_COLORS.condo, FORSALE_COLORS.wholeStructure, FORSALE_COLORS.multifamily], borderRadius: 4, maxBarThickness: 60 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw + '%' } } },
+      scales: { x: { ticks: { callback: v => v + '%' }, grid: { color: '#e1e0d9' } }, y: { grid: { display: false } } }
+    }
+  });
+  new Chart(document.getElementById('chart-forsale-home'), {
+    type: 'bar',
+    data: {
+      labels: ['Condo (for-sale)', 'Single Family / Attached\n(whole-structure)', 'Whole-building\n(Multi-Family)'],
+      datasets: [{ data: [15.4, 84.6, 0], backgroundColor: [FORSALE_COLORS.condo, FORSALE_COLORS.wholeStructure, FORSALE_COLORS.multifamily], borderRadius: 4, maxBarThickness: 60 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw + '%' } } },
+      scales: { x: { ticks: { callback: v => v + '%' }, grid: { color: '#e1e0d9' } }, y: { grid: { display: false } } }
+    }
+  });
+
+  const mhRows = withPrice.filter(r => r._bucket === 'Middle housing (2-4)');
+  const condoSeries = quarters.map(q => median(mhRows.filter(r => r._quarter === q && r.classification === 'Condo').map(r => r.price_per_unit)));
+  const wholeStructureSeries = quarters.map(q => median(mhRows.filter(r => r._quarter === q && r.classification === 'Whole-structure').map(r => r.price_per_unit)));
+  new Chart(document.getElementById('chart-forsale-time'), {
+    type: 'line',
+    data: {
+      labels: quarters,
+      datasets: [
+        { label: 'Condo', data: condoSeries, borderColor: FORSALE_COLORS.condo, backgroundColor: FORSALE_COLORS.condo + '15', fill: false, tension: 0.15, pointRadius: 2, spanGaps: true },
+        { label: 'Whole-structure', data: wholeStructureSeries, borderColor: FORSALE_COLORS.wholeStructure, backgroundColor: FORSALE_COLORS.wholeStructure + '15', fill: false, tension: 0.15, pointRadius: 2, spanGaps: true }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => '$' + (v/1000) + 'k' }, grid: { color: '#e1e0d9' } },
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 14 } }
+      }
+    }
+  });
+
+  renderMap(rows);
+}
+
+function renderMap(rows) {
+  const pts = rows.filter(r => r.latitude && r.longitude);
+  if (!mapInstance) {
+    mapInstance = L.map('map').setView([30.2672, -97.7431], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 18 }).addTo(mapInstance);
+    markerLayer = L.layerGroup().addTo(mapInstance);
+    const controls = document.getElementById('map-controls');
+    ['Single-family','Middle housing (2-4)','Multifamily (5+)'].forEach(b => {
+      const id = 'toggle-' + b.replace(/[^a-z]/gi,'');
+      controls.insertAdjacentHTML('beforeend', `<label><input type="checkbox" id="${id}" checked data-bucket="${b}"><span class="swatch" style="background:${b==='Single-family'?COLORS.single:b.startsWith('Middle')?COLORS.middle:COLORS.multi}"></span>${b}</label>`);
+    });
+    ['home_flag','sb840_flag'].forEach(f => {
+      controls.insertAdjacentHTML('beforeend', `<label><input type="checkbox" id="toggle-${f}" data-flag="${f}"><span class="swatch" style="background:${f==='home_flag'?COLORS.home:COLORS.sb840}"></span>${f==='home_flag'?'HOME only':'SB840 only'}</label>`);
+    });
+    controls.addEventListener('change', () => drawMarkers(pts));
+  }
+  drawMarkers(pts);
+}
+
+function drawMarkers(pts) {
+  markerLayer.clearLayers();
+  const activeBuckets = [...document.querySelectorAll('[data-bucket]:checked')].map(el => el.dataset.bucket);
+  const homeOnly = document.getElementById('toggle-home_flag')?.checked;
+  const sb840Only = document.getElementById('toggle-sb840_flag')?.checked;
+  let shown = 0; const cap = 4000;
+  for (const r of pts) {
+    if (shown >= cap) break;
+    const bucket = unitBucket(r.housing_units);
+    if (!bucket || !activeBuckets.includes(bucket)) continue;
+    const hasHome = !!r.home_flag, hasSb840 = !!r.sb840_flag;
+    if (homeOnly && !hasHome) continue;
+    if (sb840Only && !hasSb840) continue;
+    let color = bucket === 'Single-family' ? COLORS.single : bucket.startsWith('Middle') ? COLORS.middle : COLORS.multi;
+    if (hasHome) color = COLORS.home;
+    if (hasSb840) color = COLORS.sb840;
+    L.circleMarker([r.latitude, r.longitude], { radius: 4, color, fillColor: color, fillOpacity: 0.7, weight: 0.5 })
+      .bindPopup(`<b>${r.address || ''}</b><br>${r.housing_units} unit(s) &middot; ${bucket}<br>${hasHome ? 'HOME flagged<br>' : ''}${hasSb840 ? 'SB840 flagged<br>' : ''}Sale: $${Number(r.Price||0).toLocaleString()}`)
+      .addTo(markerLayer);
+    shown++;
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>
