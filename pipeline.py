@@ -541,9 +541,18 @@ def export_all_flagged_permits(permits, csv_path="flagged_permits_all.csv", json
     flagged = flagged[[c for c in cols if c in flagged.columns]]
     flagged.to_csv(csv_path, index=False)
 
+    # issue_date is a pandas Timestamp at this point (parsed earlier in
+    # pull_permits), which json.dump cannot serialize on its own. Convert to
+    # a plain date string before building the JSON rows, the same way
+    # permits_data.json's export already does elsewhere in this file.
+    if "issue_date" in flagged.columns:
+        flagged["issue_date"] = pd.to_datetime(flagged["issue_date"], errors="coerce").dt.strftime("%Y-%m-%d")
+
     def _clean(v):
         if isinstance(v, float) and math.isnan(v):
             return None
+        if isinstance(v, pd.Timestamp):
+            return None if pd.isna(v) else v.strftime("%Y-%m-%d")
         return v
 
     columns = list(flagged.columns)
